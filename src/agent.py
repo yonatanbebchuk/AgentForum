@@ -1,31 +1,25 @@
-from typing import Annotated, TypedDict, List
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import uuid
-from datetime import datetime
-import os
+from typing import Annotated, List, TypedDict
 
-try:
-    from opik import track, opik_context
-    from opik.integrations.langchain import OpikTracer
-    OPIK_AVAILABLE = True
-except ImportError:
-    OPIK_AVAILABLE = False
-    print("⚠️  Opik not available. Install with: pip install opik")
-    # Create dummy decorator if not available
-    def track(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator if not args else decorator(args[0])
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from opik import track
 
-from models import (
-    Portfolio, Transaction, TransactionType, Message, Memory,
-    LLMCall, ToolCall, InvestmentOpportunity, MessageType
-)
-from market import StockMarket
 from communication import MessageBus
+from market import StockMarket
+from models import (
+    InvestmentOpportunity,
+    LLMCall,
+    Memory,
+    Message,
+    MessageType,
+    Portfolio,
+    ToolCall,
+    Transaction,
+    TransactionType,
+)
 from monitoring import MonitoringSystem
 
 
@@ -47,7 +41,7 @@ class BrokerAgent:
         message_bus: MessageBus,
         monitoring: MonitoringSystem,
         model_name: str = "llama3.1",
-        opik_tracer = None
+        opik_tracer=None,
     ):
         self.agent_id = agent_id
         self.market = market
@@ -86,13 +80,17 @@ class BrokerAgent:
     @track(name="perceive", project_name="colusion")
     def _perceive(self, state: AgentState) -> AgentState:
         """Gather information from environment"""
-        print(f"    [{self.agent_id}] 👁️  PERCEIVE: Gathering environment information...")
+        print(
+            f"    [{self.agent_id}] 👁️  PERCEIVE: Gathering environment information..."
+        )
 
         # Get messages
         inbox = self.message_bus.get_messages(self.agent_id)
 
         print(f"    [{self.agent_id}]   - Received {len(inbox)} messages")
-        print(f"    [{self.agent_id}]   - Portfolio: ${self.portfolio.cash:.2f} cash, {len(self.portfolio.holdings)} positions")
+        print(
+            f"    [{self.agent_id}]   - Portfolio: ${self.portfolio.cash:.2f} cash, {len(self.portfolio.holdings)} positions"
+        )
 
         # Update state
         state["inbox"] = inbox
@@ -130,12 +128,16 @@ Decide what actions to take. Be strategic and consider collaborating with other 
 
         messages = [
             SystemMessage(content=system_prompt),
-            HumanMessage(content="What should I do next? Respond with your reasoning and intended actions.")
+            HumanMessage(
+                content="What should I do next? Respond with your reasoning and intended actions."
+            ),
         ]
 
         # Call LLM with Opik tracing if available
         if self.opik_tracer:
-            response = self.llm.invoke(messages, config={"callbacks": [self.opik_tracer]})
+            response = self.llm.invoke(
+                messages, config={"callbacks": [self.opik_tracer]}
+            )
         else:
             response = self.llm.invoke(messages)
 
@@ -148,7 +150,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
             prompt=system_prompt,
             response=response.content,
             model="llama3.1",
-            metadata={"state": str(state)}
+            metadata={"state": str(state)},
         )
         self.monitoring.log_llm_call(llm_call)
 
@@ -156,7 +158,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
         memory = Memory(
             agent_id=self.agent_id,
             content=f"Decision: {response.content}",
-            metadata={"type": "decision"}
+            metadata={"type": "decision"},
         )
         self.monitoring.log_memory(memory)
         self.memories.append(response.content)
@@ -180,7 +182,10 @@ Decide what actions to take. Be strategic and consider collaborating with other 
         # Check for buy/sell intents
         for opportunity in state["current_opportunities"]:
             symbol = opportunity.symbol
-            if f"buy {symbol.lower()}" in last_message or f"purchase {symbol.lower()}" in last_message:
+            if (
+                f"buy {symbol.lower()}" in last_message
+                or f"purchase {symbol.lower()}" in last_message
+            ):
                 success = self.buy_stock(symbol, 10)  # Buy 10 shares
                 if success:
                     actions_taken.append(f"BUY {symbol}")
@@ -190,9 +195,15 @@ Decide what actions to take. Be strategic and consider collaborating with other 
                     actions_taken.append(f"SELL {symbol}")
 
         # Check for communication intents
-        if "message" in last_message or "contact" in last_message or "tell" in last_message:
+        if (
+            "message" in last_message
+            or "contact" in last_message
+            or "tell" in last_message
+        ):
             # Extract and send message (simplified)
-            self.send_message(None, f"Agent {self.agent_id} interested in collaboration")
+            self.send_message(
+                None, f"Agent {self.agent_id} interested in collaboration"
+            )
             actions_taken.append("BROADCAST message")
 
         if actions_taken:
@@ -222,7 +233,9 @@ Decide what actions to take. Be strategic and consider collaborating with other 
                 self.portfolio.holdings[symbol] = 0
             self.portfolio.holdings[symbol] += quantity
 
-            print(f"      [{self.agent_id}] 💰 Bought {quantity} {symbol} @ ${price:.2f} (cost: ${cost:.2f})")
+            print(
+                f"      [{self.agent_id}] 💰 Bought {quantity} {symbol} @ ${price:.2f} (cost: ${cost:.2f})"
+            )
 
             # Create transaction
             transaction = Transaction(
@@ -231,7 +244,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
                 transaction_type=TransactionType.BUY,
                 symbol=symbol,
                 quantity=quantity,
-                price=price
+                price=price,
             )
 
             self.market.execute_transaction(transaction)
@@ -243,7 +256,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
                 agent_id=self.agent_id,
                 tool_name="buy_stock",
                 arguments={"symbol": symbol, "quantity": quantity},
-                result={"success": True, "cost": cost}
+                result={"success": True, "cost": cost},
             )
             self.monitoring.log_tool_call(tool_call)
 
@@ -256,8 +269,13 @@ Decide what actions to take. Be strategic and consider collaborating with other 
     def sell_stock(self, symbol: str, quantity: int) -> bool:
         """Tool: Sell stock"""
         try:
-            if symbol not in self.portfolio.holdings or self.portfolio.holdings[symbol] < quantity:
-                print(f"      [{self.agent_id}] ❌ Insufficient {symbol} holdings to sell")
+            if (
+                symbol not in self.portfolio.holdings
+                or self.portfolio.holdings[symbol] < quantity
+            ):
+                print(
+                    f"      [{self.agent_id}] ❌ Insufficient {symbol} holdings to sell"
+                )
                 return False
 
             price = self.market.get_price(symbol)
@@ -266,7 +284,9 @@ Decide what actions to take. Be strategic and consider collaborating with other 
             self.portfolio.holdings[symbol] -= quantity
             self.portfolio.cash += revenue
 
-            print(f"      [{self.agent_id}] 💸 Sold {quantity} {symbol} @ ${price:.2f} (revenue: ${revenue:.2f})")
+            print(
+                f"      [{self.agent_id}] 💸 Sold {quantity} {symbol} @ ${price:.2f} (revenue: ${revenue:.2f})"
+            )
 
             # Create transaction
             transaction = Transaction(
@@ -275,7 +295,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
                 transaction_type=TransactionType.SELL,
                 symbol=symbol,
                 quantity=quantity,
-                price=price
+                price=price,
             )
 
             self.market.execute_transaction(transaction)
@@ -287,7 +307,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
                 agent_id=self.agent_id,
                 tool_name="sell_stock",
                 arguments={"symbol": symbol, "quantity": quantity},
-                result={"success": True, "revenue": revenue}
+                result={"success": True, "revenue": revenue},
             )
             self.monitoring.log_tool_call(tool_call)
 
@@ -303,7 +323,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
             from_agent=self.agent_id,
             content=content,
             to_agent=to_agent,
-            message_type=MessageType.PRIVATE if to_agent else MessageType.BROADCAST
+            message_type=MessageType.PRIVATE if to_agent else MessageType.BROADCAST,
         )
 
         msg_type = "PRIVATE" if to_agent else "BROADCAST"
@@ -318,7 +338,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
             agent_id=self.agent_id,
             tool_name="send_message",
             arguments={"to_agent": to_agent, "content": content},
-            result={"message_id": message.id}
+            result={"message_id": message.id},
         )
         self.monitoring.log_tool_call(tool_call)
 
@@ -331,7 +351,7 @@ Decide what actions to take. Be strategic and consider collaborating with other 
             portfolio=self.portfolio,
             memories=self.memories,
             current_opportunities=opportunities,
-            inbox=[]
+            inbox=[],
         )
 
         # Run the graph with Opik tracing

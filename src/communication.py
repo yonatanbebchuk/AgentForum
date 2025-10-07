@@ -1,7 +1,8 @@
-from typing import Dict, List, Optional
-from models import Message, MessageType
 import uuid
 from datetime import datetime
+from typing import Dict, List, Optional
+
+from models import Message, MessageType
 
 
 class MessageBus:
@@ -21,7 +22,7 @@ class MessageBus:
         from_agent: str,
         content: str,
         to_agent: Optional[str] = None,
-        message_type: MessageType = MessageType.PRIVATE
+        message_type: MessageType = MessageType.PRIVATE,
     ) -> Message:
         """Send a message from one agent to another or broadcast"""
         message = Message(
@@ -30,7 +31,7 @@ class MessageBus:
             to_agent=to_agent,
             message_type=message_type,
             content=content,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         self.messages.append(message)

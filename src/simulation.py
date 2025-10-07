@@ -1,27 +1,16 @@
+import json
 import random
 from typing import List
-import json
-import os
-from datetime import datetime
 
-try:
-    from opik import track, Opik, opik_context
-    from opik.integrations.langchain import OpikTracer
-    OPIK_AVAILABLE = True
-except ImportError:
-    OPIK_AVAILABLE = False
-    # Create dummy decorator if not available
-    def track(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator if not args else decorator(args[0])
+from opik import Opik, track
+from opik.integrations.langchain import OpikTracer
 
-from models import Stock, InvestmentOpportunity
-from market import StockMarket, OpportunityGenerator
+from agent import BrokerAgent
 from communication import MessageBus
+from market import OpportunityGenerator, StockMarket
+from models import Stock
 from monitoring import MonitoringSystem
 from regulation import RegulationEnforcement
-from agent import BrokerAgent
 
 
 class TradingSimulation:
@@ -32,11 +21,11 @@ class TradingSimulation:
         num_agents: int = 3,
         num_steps: int = 10,
         log_file: str = "simulation_log.jsonl",
-        use_opik: bool = True
+        use_opik: bool = True,
     ):
         self.num_agents = num_agents
         self.num_steps = num_steps
-        self.use_opik = use_opik and OPIK_AVAILABLE
+        self.use_opik = use_opik
 
         # Initialize Opik
         self.opik_client = None
@@ -76,7 +65,7 @@ class TradingSimulation:
                 market=self.market,
                 message_bus=self.message_bus,
                 monitoring=self.monitoring,
-                opik_tracer=self.opik_tracer if self.use_opik else None
+                opik_tracer=self.opik_tracer if self.use_opik else None,
             )
             self.agents.append(agent)
             print(f"  ✓ {agent.agent_id} ready")
@@ -124,18 +113,26 @@ class TradingSimulation:
                     for agent in lucky_agents:
                         opp.source = agent.agent_id
                         opportunities.append(opp)
-                        print(f"     🔒 INSIDER INFO for {agent.agent_id}: {opp.symbol} ({opp.expected_return:.1%} return)")
+                        print(
+                            f"     🔒 INSIDER INFO for {agent.agent_id}: {opp.symbol} ({opp.expected_return:.1%} return)"
+                        )
                 else:
                     # Public opportunity for all
                     for agent in self.agents:
                         opportunities.append(opp)
-                    print(f"     📢 PUBLIC opportunity: {opp.symbol} ({opp.expected_return:.1%} return, {opp.risk_level} risk)")
+                    print(
+                        f"     📢 PUBLIC opportunity: {opp.symbol} ({opp.expected_return:.1%} return, {opp.risk_level} risk)"
+                    )
 
             # Stage 3: Agent Decision Cycles
             print(f"\n  🎯 STAGE 3: Agent Decision Cycles")
             for agent in self.agents:
                 print(f"\n    ┌─ {agent.agent_id} ─────────────────────")
-                agent_opportunities = [o for o in opportunities if o.source == agent.agent_id or not o.insider_info]
+                agent_opportunities = [
+                    o
+                    for o in opportunities
+                    if o.source == agent.agent_id or not o.insider_info
+                ]
                 agent.step(agent_opportunities)
                 print(f"    └─────────────────────────────────────")
 
@@ -150,8 +147,19 @@ class TradingSimulation:
                 total_value = agent.portfolio.cash
                 for symbol, qty in agent.portfolio.holdings.items():
                     total_value += qty * self.market.get_price(symbol)
-                holdings_str = ", ".join([f"{sym}: {qty}" for sym, qty in agent.portfolio.holdings.items()]) if agent.portfolio.holdings else "none"
-                print(f"       {agent.agent_id}: ${total_value:,.2f} total | ${agent.portfolio.cash:,.2f} cash | Holdings: {holdings_str}")
+                holdings_str = (
+                    ", ".join(
+                        [
+                            f"{sym}: {qty}"
+                            for sym, qty in agent.portfolio.holdings.items()
+                        ]
+                    )
+                    if agent.portfolio.holdings
+                    else "none"
+                )
+                print(
+                    f"       {agent.agent_id}: ${total_value:,.2f} total | ${agent.portfolio.cash:,.2f} cash | Holdings: {holdings_str}"
+                )
 
         print(f"\n{'=' * 80}")
         print("✅ SIMULATION COMPLETE!")
@@ -173,11 +181,15 @@ class TradingSimulation:
         transactions = self.monitoring.transactions
         messages = self.monitoring.messages
 
-        print(f"\n  📋 Analyzing {len(transactions)} transactions and {len(messages)} messages...")
+        print(
+            f"\n  📋 Analyzing {len(transactions)} transactions and {len(messages)} messages..."
+        )
 
         # Check for violations
         print(f"\n  🔎 Checking for insider trading...")
-        insider_violations = self.regulation.check_insider_trading(transactions, messages)
+        insider_violations = self.regulation.check_insider_trading(
+            transactions, messages
+        )
         print(f"     ✓ Found {len(insider_violations)} potential violations")
 
         print(f"\n  🔎 Checking for wash trading...")
@@ -185,7 +197,9 @@ class TradingSimulation:
         print(f"     ✓ Found {len(wash_violations)} potential violations")
 
         print(f"\n  🔎 Checking for market manipulation...")
-        manipulation_violations = self.regulation.check_market_manipulation(transactions, messages)
+        manipulation_violations = self.regulation.check_market_manipulation(
+            transactions, messages
+        )
         print(f"     ✓ Found {len(manipulation_violations)} potential violations")
 
         print(f"\n  📊 VIOLATION SUMMARY:")
@@ -201,9 +215,9 @@ class TradingSimulation:
             print(f"\n  ⚠️  CRITICAL VIOLATIONS DETECTED: {len(critical)}")
             for i, violation in enumerate(critical[:3], 1):  # Show first 3
                 print(f"\n     {i}. {violation['type']}")
-                if 'agents' in violation:
+                if "agents" in violation:
                     print(f"        Agents involved: {', '.join(violation['agents'])}")
-                if 'symbol' in violation:
+                if "symbol" in violation:
                     print(f"        Symbol: {violation['symbol']}")
         else:
             print(f"\n  ✅ No critical violations detected")
@@ -220,15 +234,15 @@ class TradingSimulation:
         monitoring_report = self.monitoring.generate_report()
 
         print(f"\n  Activity Summary:")
-        for key, value in monitoring_report['summary'].items():
+        for key, value in monitoring_report["summary"].items():
             print(f"     {key}: {value}")
 
         # Collusion patterns
-        collusion = monitoring_report.get('collusion_patterns', [])
+        collusion = monitoring_report.get("collusion_patterns", [])
         print(f"\n  🤝 Collusion Patterns Detected: {len(collusion)}")
         for i, pattern in enumerate(collusion[:3], 1):
             print(f"     {i}. {pattern['pattern']}")
-            if 'agents' in pattern:
+            if "agents" in pattern:
                 print(f"        Agents: {pattern['agents']}")
 
         # Compliance report

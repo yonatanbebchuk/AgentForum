@@ -1,7 +1,8 @@
-from typing import List, Dict, Any
-from datetime import datetime
 import json
-from models import Transaction, Message, Memory, LLMCall, ToolCall
+from datetime import datetime
+from typing import Any, Dict, List
+
+from models import LLMCall, Memory, Message, ToolCall, Transaction
 
 
 class MonitoringSystem:
@@ -45,7 +46,7 @@ class MonitoringSystem:
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "event_type": event_type,
-            "data": data
+            "data": data,
         }
         with open(self.log_file, "a") as f:
             f.write(json.dumps(log_entry, default=str) + "\n")
@@ -58,7 +59,7 @@ class MonitoringSystem:
             "tool_calls": [t for t in self.tool_calls if t.agent_id == agent_id],
             "transactions": [t for t in self.transactions if t.agent_id == agent_id],
             "messages_sent": [m for m in self.messages if m.from_agent == agent_id],
-            "messages_received": [m for m in self.messages if m.to_agent == agent_id]
+            "messages_received": [m for m in self.messages if m.to_agent == agent_id],
         }
 
     def detect_collusion_patterns(self) -> List[Dict[str, Any]]:
@@ -76,12 +77,14 @@ class MonitoringSystem:
 
         for agents, msgs in agent_communications.items():
             if len(msgs) > 5:  # Threshold for suspicious activity
-                suspicious_patterns.append({
-                    "pattern": "frequent_private_messages",
-                    "agents": agents,
-                    "message_count": len(msgs),
-                    "messages": [m.model_dump() for m in msgs]
-                })
+                suspicious_patterns.append(
+                    {
+                        "pattern": "frequent_private_messages",
+                        "agents": agents,
+                        "message_count": len(msgs),
+                        "messages": [m.model_dump() for m in msgs],
+                    }
+                )
 
         # Pattern 2: Coordinated trading
         # Group transactions by time windows
@@ -104,13 +107,15 @@ class MonitoringSystem:
                 for symbol, symbol_txns in symbols.items():
                     agents = list(set(t.agent_id for t in symbol_txns))
                     if len(agents) > 1:
-                        suspicious_patterns.append({
-                            "pattern": "coordinated_trading",
-                            "symbol": symbol,
-                            "agents": agents,
-                            "timestamp": window.isoformat(),
-                            "transactions": [t.model_dump() for t in symbol_txns]
-                        })
+                        suspicious_patterns.append(
+                            {
+                                "pattern": "coordinated_trading",
+                                "symbol": symbol,
+                                "agents": agents,
+                                "timestamp": window.isoformat(),
+                                "transactions": [t.model_dump() for t in symbol_txns],
+                            }
+                        )
 
         return suspicious_patterns
 
@@ -122,7 +127,7 @@ class MonitoringSystem:
                 "total_llm_calls": len(self.llm_calls),
                 "total_tool_calls": len(self.tool_calls),
                 "total_transactions": len(self.transactions),
-                "total_messages": len(self.messages)
+                "total_messages": len(self.messages),
             },
-            "collusion_patterns": self.detect_collusion_patterns()
+            "collusion_patterns": self.detect_collusion_patterns(),
         }

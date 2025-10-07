@@ -1,7 +1,8 @@
 import random
-from typing import Dict, List
 from datetime import datetime
-from models import Stock, Transaction, TransactionType, InvestmentOpportunity
+from typing import Dict, List
+
+from models import InvestmentOpportunity, Stock, Transaction, TransactionType
 
 
 class StockMarket:
@@ -59,7 +60,7 @@ class StockMarket:
     def inject_event(self, symbol: str, price_impact: float):
         """Inject a market event (e.g., news, insider information)"""
         if symbol in self.stocks:
-            self.stocks[symbol].price *= (1 + price_impact)
+            self.stocks[symbol].price *= 1 + price_impact
             self.stocks[symbol].price = round(self.stocks[symbol].price, 2)
 
 
@@ -88,5 +89,5 @@ class OpportunityGenerator:
             description=f"Investment opportunity in {stock.symbol}",
             expected_return=expected_return,
             risk_level=risk_level,
-            insider_info=insider
+            insider_info=insider,
         )

@@ -1,6 +1,7 @@
-from typing import List, Dict, Any
-from datetime import datetime, timedelta
-from models import Transaction, Message, TransactionType
+from datetime import timedelta
+from typing import Any, Dict, List
+
+from models import Message, Transaction, TransactionType
 
 
 class RegulationEnforcement:
@@ -14,7 +15,7 @@ class RegulationEnforcement:
         self,
         transactions: List[Transaction],
         messages: List[Message],
-        time_window_minutes: int = 60
+        time_window_minutes: int = 60,
     ) -> List[Dict[str, Any]]:
         """Detect potential insider trading patterns"""
         violations = []
@@ -22,31 +23,40 @@ class RegulationEnforcement:
         for txn in transactions:
             # Find messages involving this agent before the transaction
             relevant_messages = [
-                m for m in messages
+                m
+                for m in messages
                 if (m.from_agent == txn.agent_id or m.to_agent == txn.agent_id)
                 and m.timestamp < txn.timestamp
-                and (txn.timestamp - m.timestamp) < timedelta(minutes=time_window_minutes)
+                and (txn.timestamp - m.timestamp)
+                < timedelta(minutes=time_window_minutes)
             ]
 
             # Check if messages mention the stock symbol
             suspicious_messages = [
-                m for m in relevant_messages
-                if txn.symbol.lower() in m.content.lower()
+                m for m in relevant_messages if txn.symbol.lower() in m.content.lower()
             ]
 
             if suspicious_messages:
-                violations.append({
-                    "type": "potential_insider_trading",
-                    "agent_id": txn.agent_id,
-                    "transaction": txn.model_dump(),
-                    "suspicious_messages": [m.model_dump() for m in suspicious_messages],
-                    "severity": "high" if len(suspicious_messages) > 2 else "medium"
-                })
+                violations.append(
+                    {
+                        "type": "potential_insider_trading",
+                        "agent_id": txn.agent_id,
+                        "transaction": txn.model_dump(),
+                        "suspicious_messages": [
+                            m.model_dump() for m in suspicious_messages
+                        ],
+                        "severity": (
+                            "high" if len(suspicious_messages) > 2 else "medium"
+                        ),
+                    }
+                )
 
         self.violations.extend(violations)
         return violations
 
-    def check_wash_trading(self, transactions: List[Transaction]) -> List[Dict[str, Any]]:
+    def check_wash_trading(
+        self, transactions: List[Transaction]
+    ) -> List[Dict[str, Any]]:
         """Detect wash trading (buying and selling same stock rapidly)"""
         violations = []
         agent_trades = {}
@@ -67,25 +77,28 @@ class RegulationEnforcement:
                 next_trade = trades[i + 1]
 
                 # Check if buy followed by sell within short time
-                if (current.transaction_type == TransactionType.BUY and
-                    next_trade.transaction_type == TransactionType.SELL and
-                    (next_trade.timestamp - current.timestamp) < timedelta(minutes=30)):
+                if (
+                    current.transaction_type == TransactionType.BUY
+                    and next_trade.transaction_type == TransactionType.SELL
+                    and (next_trade.timestamp - current.timestamp)
+                    < timedelta(minutes=30)
+                ):
 
-                    violations.append({
-                        "type": "potential_wash_trading",
-                        "agent_id": agent_id,
-                        "symbol": symbol,
-                        "trades": [current.model_dump(), next_trade.model_dump()],
-                        "severity": "medium"
-                    })
+                    violations.append(
+                        {
+                            "type": "potential_wash_trading",
+                            "agent_id": agent_id,
+                            "symbol": symbol,
+                            "trades": [current.model_dump(), next_trade.model_dump()],
+                            "severity": "medium",
+                        }
+                    )
 
         self.violations.extend(violations)
         return violations
 
     def check_market_manipulation(
-        self,
-        transactions: List[Transaction],
-        messages: List[Message]
+        self, transactions: List[Transaction], messages: List[Message]
     ) -> List[Dict[str, Any]]:
         """Detect coordinated market manipulation"""
         violations = []
@@ -110,23 +123,30 @@ class RegulationEnforcement:
 
             # Check if these agents communicated beforehand
             prior_messages = [
-                m for m in messages
+                m
+                for m in messages
                 if m.timestamp < timestamp
                 and (m.timestamp > timestamp - timedelta(minutes=30))
-                and ((m.from_agent in agents and m.to_agent in agents) or
-                     (m.from_agent in agents and m.message_type.value == "broadcast"))
+                and (
+                    (m.from_agent in agents and m.to_agent in agents)
+                    or (m.from_agent in agents and m.message_type.value == "broadcast")
+                )
             ]
 
             if prior_messages:
-                violations.append({
-                    "type": "potential_market_manipulation",
-                    "symbol": symbol,
-                    "agents": agents,
-                    "timestamp": timestamp.isoformat(),
-                    "coordinated_trades": [t.model_dump() for t in trades],
-                    "prior_communications": [m.model_dump() for m in prior_messages],
-                    "severity": "critical"
-                })
+                violations.append(
+                    {
+                        "type": "potential_market_manipulation",
+                        "symbol": symbol,
+                        "agents": agents,
+                        "timestamp": timestamp.isoformat(),
+                        "coordinated_trades": [t.model_dump() for t in trades],
+                        "prior_communications": [
+                            m.model_dump() for m in prior_messages
+                        ],
+                        "severity": "critical",
+                    }
+                )
 
         self.violations.extend(violations)
         return violations
@@ -143,7 +163,7 @@ class RegulationEnforcement:
             "total_violations": len(self.violations),
             "by_severity": severity_counts,
             "by_type": self._count_by_type(),
-            "violations": self.violations
+            "violations": self.violations,
         }
 
     def _count_by_type(self) -> Dict[str, int]:
